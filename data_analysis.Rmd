@@ -209,24 +209,17 @@ theme_matched  <- theme_light() +
                    panel.grid = element_blank()
                    )
 
-labels_unmatched <- list(
-  ylab("Survival Probability"),
-  xlab("Time"),
-  ggtitle("Unmatched Cohorts")
-             )
+labels_unmatched <- list(ggtitle("Unmatched Cohorts"))
 
-labels_matched <- list(
-  ylab("Survival Probability"),
-  xlab("Time"),
-  ggtitle("Propensity Score Matched Cohorts")
-             )
+labels_matched <- list(ggtitle("Propensity Score Matched Cohorts"))
 ```
 
 # Load data
 ```{r load data}
 #set location of source file
 path <- "C:/Users/julia/SRP/S&D/dataset/pubsaf2303/"
-load(paste0(path, "clean_data0911.RData"))
+load(paste0(path, "clean_data_1113_jhlt.RData"))
+
 center_geocodes <- read.csv(file = "C:/Users/julia/SRP/S&D/dataset/center_geocodes.csv")
 
 #specify study period
@@ -241,8 +234,7 @@ path_save <- "C:/Users/julia/SRP/S&D/Drafts/Distance/"
 
 #add HCV data to complete_data_dcd
 complete_data_dcd <- complete_data_dcd %>% 
-  left_join(tx_hr %>% dplyr::select(PX_ID, DONOR_ID), by = "PX_ID") %>% 
-  left_join(donor %>% dplyr::select(DONOR_ID, DON_HCV_STAT, DON_HCV_NAT)) %>% 
+  left_join(donor %>% dplyr::select(DONOR_ID, DON_HCV_STAT, DON_HCV_NAT), by = "DONOR_ID") %>% 
   set_variable_labels(DON_HCV_NAT = "Donor HCV NAT Serology") %>% 
   mutate(DON_HCV_NAT = ifelse(DON_HCV_NAT=="P", "Positive", "Negative"))
 
@@ -345,6 +337,7 @@ f2_df <- f1_df %>%
   group_by(REC_CTR_CD, procurement_type) %>% 
   count()
 ```
+
 ```{r figure 2a}
 # Calculate the sum of n for each REC_CTR_CD
 sum_by_type <- f1_df %>% 
@@ -412,6 +405,7 @@ procurement_map1 <- ggplot() +
 
 ggsave(paste0(path_save,"Figure2a.tiff"), procurement_map1, dpi = "print",width=7.29, height = 5)
 ```
+
 ```{r figure 2b}
 # Calculate the sum of n for each REC_CTR_CD
 sum_n <- f2_df %>% 
@@ -625,6 +619,7 @@ table1 <- CreateTableOne(data = table1_data,
                          "rec_sex",
                          "simple_diagnosis",
                          "treatment",
+                         "rec_infection",
                          "rec_race_desc",
                          "functional_status",
                          "rec_abo",
@@ -653,14 +648,63 @@ table1 <- print(table1,
       showAllLevels=FALSE, 
       cramVars=NULL, 
       dropEqual=FALSE, 
-      exact=NULL, 
-      nonnormal=NULL, 
+      exact=c("rec_age_60", 
+              "status",
+              "rec_dialysis",
+              "rec_sex",
+              "simple_diagnosis",
+              "treatment",
+              "rec_race_desc",
+              "functional_status",
+              "rec_abo",
+              "rec_edu",
+              "don_sex",
+              "don_smoke",
+              "don_abo",
+              "DON_HCV_NAT"), 
+      nonnormal=c("rec_bilirubin",
+                  "rec_dialysis",
+                  "rec_bmi",
+                  "rec_co",
+                  "rec_pcwp",
+                  "don_age",
+                  "don_bmi",
+                  "don_lvef",
+                  "wdt_time_min"), 
       minMax=FALSE, 
       formatOptions=list(scientific=FALSE))
 
-write.csv(table1, file = paste0(path_save, "table1_0911.csv"))
-```
+only_treatments <- table1_data %>% 
+  dplyr::select(procurement_type, treatment)
 
+table1_treatment <- CreateTableOne(
+  data = only_treatments,
+  vars = "treatment",
+  factorVars = "treatment",
+  strata = "procurement_type"
+)
+
+print(table1_treatment, 
+      catDigits=1, 
+      contDigits=2, 
+      pDigits=3, 
+      quote=FALSE, 
+      missing=FALSE, 
+      explain=TRUE, 
+      printToggle=TRUE,
+      test=TRUE, 
+      smd=FALSE, 
+      noSpaces=FALSE, 
+      padColnames=FALSE, 
+      varLabels=TRUE, 
+      format=c("fp","f","p","pf")[1], 
+      showAllLevels=FALSE, 
+      cramVars=NULL, 
+      dropEqual=FALSE, 
+      exact=NULL)
+
+write.csv(table1, file = paste0(path_save, "table1_1103.csv"))
+```
 
 # Survival Analysis
 ```{r}
@@ -670,10 +714,13 @@ complete_data_dcd <- complete_data_dcd %>%
   mutate(wdt_time_qtile = factor(wdt_time_qtile, levels = c("1", "2", "3", "4"),labels = c("1st quartile", "2nd quartile", "3rd quartile", "4th quartile"))) %>%   mutate(don_bmi_qtile = ntile(don_bmi, 4)) %>% 
   mutate(don_bmi_qtile = factor(don_bmi_qtile, levels = c("1", "2", "3", "4"),labels = c("1st quartile", "2nd quartile", "3rd quartile", "4th quartile")))
 
+#pre-match matchit object
+data_nrp_dpp <- complete_data_dcd %>% 
+  mutate(nrp = ifelse(procurement_type== "DCD_NRP", 1, 0))
 ```
 
 ## Unadjusted Kaplan-Meier Curve
-```{r}
+```{r 365}
 # Fit Kaplan-Meier survival curves for each group
 fit <- survfit(Surv(surv_time_365, dead_1y) ~ procurement_type, data = complete_data_dcd)
 
@@ -687,8 +734,9 @@ km_plot <- ggsurvplot(fit, data = complete_data_dcd, risk.table = TRUE,
            pval = TRUE,
            conf.int = TRUE,
            palette = c("#7CA5CB","#A33E3E"),
-           xlab = "Time", ylab = "Survival Probability",
-           title = "Kaplan-Meier Survival Curve",
+           xlab = "Days", 
+           ylab = "Survival Probability",
+           title = "Unmatched Cohorts (n=318)",
            ylim = c(0.80, 1.0),
            risk.table.fontsize = 3,  # Adjust the font size for the risk table
            break.time.by = 100,      # Set the break time for the x-axis
@@ -712,8 +760,70 @@ km_plot_no_ci <- ggsurvplot(fit, data = complete_data_dcd, risk.table = TRUE,
            pval = TRUE,
            conf.int = FALSE,
            palette = c("#7CA5CB","#A33E3E"),
-           xlab = "Time", ylab = "Survival Probability",
-           title = "Kaplan-Meier Survival Curve",
+           xlab = "Time", 
+           ylab = "Survival Probability",
+           title = "Unmatched cohorts (n=318)",
+           ylim = c(0.80, 1.0),
+           risk.table.fontsize = 3,  # Adjust the font size for the risk table
+           break.time.by = 100,      # Set the break time for the x-axis
+           xlab.text.size = 8,       # Adjust the font size for x-axis label
+           ylab.text.size = 8,       # Adjust the font size for y-axis label
+           legend.text.size = 8,     # Adjust the font size for legend text
+           ggtheme = theme_light() +
+             theme(text = element_text(size = 8),
+                   axis.title.x = element_text(size = 8),
+                   axis.title.y = element_text(size = 8),
+                   legend.text = element_text(size = 8),
+                   plot.title = element_text(size = 12),
+                   axis.text.x = element_text(size = 8),
+                   axis.text.y = element_text(size = 8),
+                   panel.grid = element_blank()
+)) 
+
+
+```
+
+```{r 547}
+# Fit Kaplan-Meier survival curves for each group
+fit_18m <- survfit(Surv(surv_time_18m, dead_18m) ~ procurement_type, data = complete_data_dcd)
+
+grid.draw.ggsurvplot <- function(x){
+  survminer:::print.ggsurvplot(x, newpage = FALSE)
+}
+
+km_plot_18m <- ggsurvplot(fit_18m, data = complete_data_dcd, risk.table = TRUE, 
+           legend.labs = c("DCD DPP", "DCD NRP"),
+           legend.title = element_blank(),
+           pval = TRUE,
+           conf.int = TRUE,
+           palette = c("#7CA5CB","#A33E3E"),
+           xlab = "Days", ylab = "Survival Probability",
+           title = "Unmatched Cohorts (n=318)",
+           ylim = c(0.80, 1.0),
+           risk.table.fontsize = 3,  # Adjust the font size for the risk table
+           break.time.by = 100,      # Set the break time for the x-axis
+           xlab.text.size = 8,       # Adjust the font size for x-axis label
+           ylab.text.size = 8,       # Adjust the font size for y-axis label
+           legend.text.size = 8,     # Adjust the font size for legend text
+           ggtheme = theme_light() +
+             theme(text = element_text(size = 8),
+                   axis.title.x = element_text(size = 8),
+                   axis.title.y = element_text(size = 8),
+                   legend.text = element_text(size = 8),
+                   plot.title = element_text(size = 12),
+                   axis.text.x = element_text(size = 8),
+                   axis.text.y = element_text(size = 8),
+                   panel.grid = element_blank()
+)) 
+
+km_plot_no_ci_18m <- ggsurvplot(fit_18m, data = complete_data_dcd, risk.table = TRUE, 
+           legend.labs = c("DCD DPP", "DCD NRP"),
+           legend.title = element_blank(),
+           pval = TRUE,
+           conf.int = FALSE,
+           palette = c("#7CA5CB","#A33E3E"),
+           xlab = "Days", ylab = "Survival Probability",
+           title = "Unmatched Cohorts (n=318)",
            ylim = c(0.80, 1.0),
            risk.table.fontsize = 3,  # Adjust the font size for the risk table
            break.time.by = 100,      # Set the break time for the x-axis
@@ -732,15 +842,12 @@ km_plot_no_ci <- ggsurvplot(fit, data = complete_data_dcd, risk.table = TRUE,
 )) 
 
 #compare survival between procurement groups
-survdiff(Surv(surv_time_365, dead_1y) ~ procurement_type, data = complete_data_dcd)
+survdiff(Surv(surv_time_18m, dead_18m) ~ procurement_type, data = complete_data_dcd)
 
 ```
+
 ## 1:1 Propensity Score Match
 ```{r}
-#pre-match matchit object
-data_nrp_dpp <- complete_data_dcd %>% 
-  mutate(nrp = ifelse(procurement_type== "DCD_NRP", 1, 0))
-
 bal.tab(procurement_type ~ agonal_time_bin +
                    rec_age_60 +
                    status +
@@ -769,7 +876,7 @@ bal.tab(procurement_type ~ agonal_time_bin +
 )
 
 
-#1:1 OLS PS matching with replacement
+#1:1 OLS PS matching without replacement
 post_match_nrp_dpp <- matchit(nrp ~ 
                                 wdt_time_qtile +
                                 rec_age_60 +
@@ -780,7 +887,8 @@ post_match_nrp_dpp <- matchit(nrp ~
                    distance = "glm",
                    link = "logit",
                    estimand = "ATT",
-                   replace = FALSE)
+                   replace = FALSE,
+                   caliper = 0.2)
 
 
 bal.tab(post_match_nrp_dpp, stats = c("m", "v"), thresholds = c(m = .1))
@@ -826,7 +934,7 @@ love_plot_nrp_dpp <- love.plot(post_match_nrp_dpp,
         panel.grid = element_blank())
 
 
-ggsave(paste0(path_save,"Supplemental Figure 1 0918.tiff"), plot = love_plot_nrp_dpp,height = 7,width = 14,units = "in")
+ggsave(paste0(path_save,"Supplemental Figure 1.tiff"), plot = love_plot_nrp_dpp,height = 7,width = 14,units = "in")
 
 
 #get matched data
@@ -836,11 +944,154 @@ matched_nrp_dpp <- match.data(post_match_nrp_dpp, group = "all",distance = "prop
 View(matched_nrp_dpp %>% group_by(nrp) %>% count())
 ```
 
-
-## Kaplan-Meier Curve after Propensity Score Matching
 ```{r}
 # Fit Kaplan-Meier survival curves for each group
-fit_matched_dcd <- survfit(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp)
+fit_matched <- survfit(Surv(surv_time_365, dead_1y) ~ procurement_type, data = matched_nrp_dpp)
+
+grid.draw.ggsurvplot <- function(x){
+  survminer:::print.ggsurvplot(x, newpage = FALSE)
+}
+
+km_plot_matched <- ggsurvplot(fit_matched, data = matched_nrp_dpp, risk.table = TRUE, 
+           legend.labs = c("DCD DPP", "DCD NRP"),
+           legend.title = element_blank(),
+           pval = TRUE,
+           conf.int = TRUE,
+           palette = c("#7CA5CB","#A33E3E"),
+           xlab = "Days", 
+           ylab = "Survival Probability",
+           title = "Matched Cohorts (n=204)",
+           ylim = c(0.80, 1.0),
+           risk.table.fontsize = 3,  # Adjust the font size for the risk table
+           break.time.by = 100,      # Set the break time for the x-axis
+           xlab.text.size = 8,       # Adjust the font size for x-axis label
+           ylab.text.size = 8,       # Adjust the font size for y-axis label
+           legend.text.size = 8,     # Adjust the font size for legend text
+           ggtheme = theme_light() +
+             theme(text = element_text(size = 8),
+                   axis.title.x = element_text(size = 8),
+                   axis.title.y = element_text(size = 8),
+                   legend.text = element_text(size = 8),
+                   plot.title = element_text(size = 12),
+                   axis.text.x = element_text(size = 8),
+                   axis.text.y = element_text(size = 8),
+                   panel.grid = element_blank()
+)) 
+
+
+#make graphs with CI
+dcd_graph <- list()
+dcd_graph[[1]] <- km_plot
+dcd_graph[[2]] <- km_plot_matched
+dcd_graph <- arrange_ggsurvplots(dcd_graph, print = TRUE,
+  ncol = 2, nrow = 1, risk.table.height = 0.2)
+
+ggsave(paste0(path_save, "Figure 4 0114.tiff"),dcd_graph, dpi = "print",width=7.29, height = 5)
+```
+
+# Table S1: Donor and recipient characteristics by procurement type for matched cohorts
+```{r table s1}
+tables1_data <- matched_nrp_dpp %>% 
+  mutate(dpp_nrp = case_when(
+    procurement_type == "DCD_DPP" ~ "DPP",
+    procurement_type == "DCD_NRP" ~ "NRP"
+  ))
+  
+tables1 <- CreateTableOne(data = tables1_data,
+               vars = c("rec_age_60", 
+                        "status",
+                         "rec_bilirubin",
+                         "rec_dialysis",
+                         "rec_sex",
+                         "simple_diagnosis",
+                         "rec_infection",
+                         "treatment",
+                         "rec_race_desc",
+                         "functional_status",
+                         "rec_abo",
+                         "rec_bmi",
+                         "rec_co",
+                         "rec_pcwp",
+                         "don_age",
+                         "don_sex",
+                         "don_bmi",
+                         "don_lvef",
+                         "don_smoke",
+                         "don_abo",
+                        "wdt_time_min",
+                        "DON_HCV_NAT",
+                        "don_angio"),
+               factorVars = c("rec_age_60", 
+                         "status",
+                         "rec_dialysis",
+                         "rec_sex",
+                         "rec_infection",
+                         "simple_diagnosis",
+                         "treatment",
+                         "rec_race_desc",
+                         "functional_status",
+                         "rec_abo",
+                         "rec_edu",
+                         "don_sex",
+                         "don_smoke",
+                         "don_abo",
+                         "DON_HCV_NAT"),
+               strata = "procurement_type",
+              )
+
+tables1 <- print(tables1, 
+      catDigits=1, 
+      contDigits=2, 
+      pDigits=3, 
+      quote=FALSE, 
+      missing=FALSE, 
+      explain=TRUE, 
+      printToggle=TRUE,
+      test=TRUE, 
+      smd=FALSE, 
+      noSpaces=FALSE, 
+      padColnames=FALSE, 
+      varLabels=TRUE, 
+      format=c("fp","f","p","pf")[1], 
+      showAllLevels=FALSE, 
+      cramVars=NULL, 
+      dropEqual=FALSE, 
+      exact=c("rec_age_60", 
+              "status",
+              "rec_dialysis",
+              "rec_sex",
+              "simple_diagnosis",
+              "treatment",
+              "rec_race_desc",
+              "functional_status",
+              "rec_abo",
+              "rec_edu",
+              "don_sex",
+              "don_smoke",
+              "don_abo",
+              "DON_HCV_NAT"), 
+      nonnormal=c("rec_bilirubin",
+                  "rec_dialysis",
+                  "rec_bmi",
+                  "rec_co",
+                  "rec_pcwp",
+                  "don_age",
+                  "don_bmi",
+                  "don_lvef",
+                  "wdt_time_min"), 
+      minMax=FALSE, 
+      formatOptions=list(scientific=FALSE))
+
+write.csv(tables1, file = paste0(path_save, "table_s1_1028.csv"))
+```
+
+
+
+
+## Kaplan-Meier Curve after Propensity Score Matching
+```{r 365 after match}
+# Fit Kaplan-Meier survival curves for each group
+fit_matched_dcd <- survfit(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp_all)
 
 fit_dcd <- survfit(Surv(surv_time_365, dead_1y) ~ nrp, data = data_nrp_dpp)
 
@@ -887,7 +1138,7 @@ ggsave(paste0(path_save, "km_dcd_matched_0905.tiff"),km_dcd_matched, dpi = "prin
 prop.test(x = c(102-9,102-7), n = c(102,102))
 #compare survival between procurement groups
 #post-match
-survdiff(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp)
+survdiff(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp_all)
 #pre-match
 survdiff(Surv(surv_time_365, dead_1y) ~ nrp, data = data_nrp_dpp)
 
@@ -898,21 +1149,94 @@ dcd_with_ci[[2]] <- km_dcd_matched
 dcd_with_ci <- arrange_ggsurvplots(dcd_with_ci, print = TRUE,
   ncol = 2, nrow = 1, risk.table.height = 0.2)
 
-ggsave(paste0(path_save, "Figure4_w_CI_0918.tiff"),dcd_with_ci, dpi = "print",width=7.29, height = 5)
+ggsave(paste0(path_save, "Figure4_w_CI_1016.tiff"),dcd_with_ci, dpi = "print",width=7.29, height = 5)
+```
+
+```{r 547 after match}
+# Fit Kaplan-Meier survival curves for each group
+fit_matched_dcd_18m <- survfit(Surv(surv_time_18m, dead_18m) ~ nrp, data = matched_nrp_dpp)
+
+fit_dcd_18m <- survfit(Surv(surv_time_18m, dead_18m) ~ nrp, data = data_nrp_dpp)
+
+#adjust grid structure
+grid.draw.ggsurvplot <- function(x){
+  survminer:::print.ggsurvplot(x, newpage = FALSE)
+}
+
+#pre-match KM with CI
+km_dcd_plot_18m <- ggsurvplot(fit_dcd_18m, data = data_nrp_dpp, risk.table = TRUE, 
+           legend.labs = c("DPP", "NRP"),
+           pval = TRUE,
+           conf.int = TRUE,
+           palette = c("#7CA5CB","#A33E3E"),
+           xlab = "Days", ylab = "Survival Probability",
+           ylim = c(0.70, 1.0),
+           xlim = c(0,547),
+           risk.table.fontsize = 3,  # Adjust the font size for the risk table
+           break.time.by = 100,      # Set the break time for the x-axis
+           ggtheme = theme_unmatched,
+           tables.y.text = FALSE,
+           tables.theme = theme_cleantable(),
+           title = "Unmatched Cohorts")
+
+ggsave(paste0(path_save, "km_dcd_plot_1016.tiff"),km_dcd_plot_18m, dpi = "print",width=7.29, height = 5)
+
+
+#matched KM
+km_dcd_matched_18m <- ggsurvplot(fit_matched_dcd_18m, data = matched_nrp_dpp, risk.table = TRUE,
+           legend.labs = c("DPP","NRP"),
+           legend.title = element_blank(),
+           pval = TRUE,
+           conf.int = TRUE,
+           palette = c("#7CA5CB","#A33E3E"),
+           xlab = "Days", ylab = "Survival Probability",
+
+           ylim = c(0.70, 1.0),
+           xlim = c(0,547),
+           risk.table.fontsize = 3,  # Adjust the font size for the risk table
+           break.time.by = 100,      # Set the break time for the x-axis
+           ggtheme = theme_matched,
+           tables.y.text = FALSE,
+           tables.theme = theme_cleantable(),
+           title = "Propensity Score Matched Cohorts") 
+
+
+ggsave(paste0(path_save, "km_dcd_matched_1016.tiff"),km_dcd_matched_18m, dpi = "print",width=7.29, height = 5)
+
+
+#proportion test
+prop.test(x = c(102-9,102-7), n = c(102,102))
+#compare survival between procurement groups
+#post-match
+survdiff(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp)
+#pre-match
+survdiff(Surv(surv_time_365, dead_1y) ~ nrp, data = data_nrp_dpp)
+
+#make graphs with CI
+dcd_with_ci_18m <- list()
+dcd_with_ci_18m[[1]] <- km_dcd_plot_18m
+dcd_with_ci_18m[[2]] <- km_dcd_matched_18m
+dcd_with_ci_18m <- arrange_ggsurvplots(dcd_with_ci_18m, print = TRUE,
+  ncol = 2, nrow = 1, risk.table.height = 0.2)
+
+ggsave(paste0(path_save, "Figure4_w_CI_18m.tiff"),dcd_with_ci_18m, dpi = "print",width=7.29, height = 5)
 ```
 
 # Estimate Cox-Proportional Hazard Fixed Effect Model
 ## Table 2, Cox-Proportional Hazard Model Output
-```{r}
+```{r 365 table 2 }
 fit_cox_matched <- coxph(Surv(surv_time_365, dead_1y) ~
                       nrp,
-                    data = matched_nrp_dpp)
+                    data = matched_nrp_dpp, cluster = subclass)
 
 summary(fit_cox_matched)
+cox.zph(fit_cox_matched)
 
 fit_cox_unmatched <- coxph(Surv(surv_time_365, dead_1y) ~
                       nrp,
                     data = data_nrp_dpp)
+
+cox.zph(fit_cox_unmatched)
 
 summary(fit_cox_unmatched)
 
@@ -930,9 +1254,36 @@ export_summs(fit_cox_unmatched,
                              
 ```
 
+```{r 547 table 2}
+fit_cox_matched_18m <- coxph(Surv(surv_time_18m, dead_18m) ~
+                      nrp,
+                    data = matched_nrp_dpp)
+
+summary(fit_cox_matched_18m)
+
+fit_cox_unmatched_18m <- coxph(Surv(surv_time_18m, dead_18m) ~
+                      nrp,
+                    data = data_nrp_dpp)
+
+summary(fit_cox_unmatched_18m)
+
+export_summs(fit_cox_unmatched,
+     fit_cox_matched, 
+     scale = TRUE,
+     model.names = c("Unmatched", "PS Matched"),
+     coefs = c("Procurement Type NRP" = "nrp"),
+     number_format = "%.2f",
+     statistics = c(N = "n", "N Events" = "nevent"),
+     align = ".",
+     error_format = "({conf.low} to {conf.high})",
+     to.file = "xlsx",
+     file.name = paste0(path_save,"Table2_1.xlsx"))
+                             
+```
+
 # Estimate Mixed Effect Model
 ## COXME model
-```{r}
+```{r 365 coxme}
 
 fit_coxme_matched <- coxme(Surv(surv_time_365, dead_1y) ~
                       nrp + (1|REC_CTR_CD),
@@ -949,6 +1300,28 @@ fit_coxme_unmatched_empty <- coxme(Surv(surv_time_365, dead_1y) ~
                       nrp + (1|REC_CTR_CD),
                     data = data_nrp_dpp)
 
+fit_coxme_unmatched_empty
+fit_coxme_unmatched_full
+
+```
+
+```{r 547 coxme}
+
+fit_coxme_matched_18m <- coxme(Surv(surv_time_18m, dead_18m) ~
+                      nrp + (1|REC_CTR_CD),
+                    data = matched_nrp_dpp)
+
+
+fit_coxme_unmatched_full <- coxme(Surv(surv_time_18m, dead_18m) ~
+                      nrp + wdt_time_qtile + rec_age_60 + treatment + don_age + don_bmi + (1|REC_CTR_CD),
+                    data = data_nrp_dpp)
+
+data_nrp_dpp$treatment <- relevel(as.factor(data_nrp_dpp$treatment), ref = "LVAD")
+fit_coxme_unmatched_empty <- coxme(Surv(surv_time_18m, dead_18m) ~
+                      nrp + (1|REC_CTR_CD),
+                    data = data_nrp_dpp)
+
+summary(fit_coxme_matched_18m)
 fit_coxme_unmatched_empty
 fit_coxme_unmatched_full
 
@@ -1115,7 +1488,7 @@ unmatched_nrp <- as.numeric(survdata_unmatched$nrp)
 mean_survival_unmatched<- rmst2(unmatched_surv_time, unmatched_dead_1y,unmatched_nrp)
 
 
-survdata_matched <- matched_nrp_dpp %>% 
+survdata_matched <- matched_nrp_dpp_all%>% 
   dplyr::select(nrp,
          surv_time_365,
          dead_1y) 
@@ -1142,8 +1515,6 @@ max(nrp_agonal)
 dpp_data
 ```
 
-
-
 # Sensitivity Analysis
 ## Adding distance
 ```{r}
@@ -1152,46 +1523,42 @@ data_nrp_dpp <- data_nrp_dpp %>%
   mutate(distance_qtile = factor(distance_qtile, levels = c("1", "2", "3", "4"),labels = c("1st quartile", "2nd quartile", "3rd quartile", "4th quartile")))
 
 #add distance
-post_match_nrp_dpp1 <- matchit(nrp ~ 
-                                agonal_time_bin +
+post_match_nrp_dpp_distance <- matchit(nrp ~ 
+                                wdt_time_qtile +
                                 rec_age_60 +
                                 treatment +
                                 don_age +
-                                don_bmi_qtile +
-                                don_angio +
-                                distance_qtile,
+                                don_bmi +
+                                distance,
                    data = data_nrp_dpp,method = "optimal",
                    distance = "glm",
                    link = "logit",
                    estimand = "ATT",
                    replace = FALSE)
 
-new.names <- c(`agonal_time_bin_20+` = "Agonal Time: 20+ Minutes",
-               treatment_ECMO = "Recipient Treatment: ECMO",
+new.names <- c(treatment_ECMO = "Recipient Treatment: ECMO",
                `treatment_High-dose Inotropes` = "Recipient Treatment: High-dose Inotropes",
                treatment_None = "Recipient Treatment: None",
-               `don_bmi_qtile_2nd quartile` = "Donor BMI: 2nd Quartile",
-               `don_bmi_qtile_4th quartile` = "Donor BMI: 4th Quartile",
                `rec_age_60_Over 60` = "Recipient Age: Over 60",
-               `agonal_time_bin_0-4` = "Agonal Time: 0-4 Minutes",
                `treatment_IABP` = "Recipient Treatment: IABP",
-               `agonal_time_bin_5-9` = "Agonal Time: 5-9 Minutes",
                treatment_Exception = "Recipient Treatment: Exception",
                don_angio_Performed = "Donor Coronary Angiogram: Performed",
                `treatment_Other MCS` = "Recipient Treatment: Other MCS",
                `don_age` = "Donor Age (Years)",
                `treatment_Low-dose Inotropes` = "Recipient Treatment: Low-dose Inotropes",
-               `agonal_time_bin_10-14` = "Agonal Time: 10-14 Minutes",
-               `agonal_time_bin_15-19` = "Agonal Time: 15-19 Minutes",
+               `wdt_time_qtile_1st quartile` = "Withdrawal-to-Death Time: 1st Quartile",
+               `wdt_time_qtile_2nd quartile` = "Withdrawal-to-Death Time: 2nd Quartile",
+               `wdt_time_qtile_3rd quartile` = "Withdrawal-to-Death Time: 3rd Quartile",
+               `wdt_time_qtile_4th quartile` = "Withdrawal-to-Death Time: 4th Quartile",
                treatment_LVAD = "Recipient Treatment: LVAD",
-               `don_bmi_qtile_1st quartile` = "Donor BMI: 1st Quartile",
-               `don_bmi_qtile_3rd quartile` = "Donor BMI: 3rd Quartile",
-               `distance_qtile_1st quartile` = "Distance: 1st Quartile",
-               `distance_qtile_2nd quartile` = "Distance: 2nd Quartile",
-               `distance_qtile_3rd quartile` = "Distance: 3rd Quartile",
-               `distance_qtile_4th quartile` = "Distance: 4th Quartile")
+               distance = "Donor-Recipient Distance",
+               # `distance_qtile_1st quartile` = "Distance: 1st Quartile",
+               # `distance_qtile_2nd quartile` = "Distance: 2nd Quartile",
+               # `distance_qtile_3rd quartile` = "Distance: 3rd Quartile",
+               # `distance_qtile_4th quartile` = "Distance: 4th Quartile",
+               don_bmi = "Donor BMI")
 
-love.plot(post_match_nrp_dpp1, 
+love_plot_with_distance <- love.plot(post_match_nrp_dpp_distance, 
           drop.distance = TRUE, 
           stars = "raw",
           var.order = "adjusted",
@@ -1208,38 +1575,337 @@ love.plot(post_match_nrp_dpp1,
         panel.grid = element_blank())
 
 #get matched data
-matched_nrp_dpp1 <- match.data(post_match_nrp_dpp1, group = "all",distance = "prop_score", data = data_nrp_dpp, drop.unmatched = TRUE)
+matched_nrp_dpp_distance <- match.data(post_match_nrp_dpp_distance, group = "all",distance = "prop_score", data = data_nrp_dpp, drop.unmatched = TRUE)
 
-fit_matched_dcd1 <- survfit(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp1)
+fit_matched_dcd_distance <- survfit(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp_distance)
 
 #matched KM
-ggsurvplot(fit_matched_dcd1, data = matched_nrp_dpp, risk.table = TRUE, 
-           legend.labs = c("DCD DPP","DCD NRP"),
+matched_with_distance <- ggsurvplot(fit_matched_dcd_distance, data = matched_nrp_dpp_distance, risk.table = TRUE, 
+           legend.labs = c("DCD DPP", "DCD NRP"),
            legend.title = element_blank(),
            pval = TRUE,
            conf.int = TRUE,
            palette = c("#7CA5CB","#A33E3E"),
+           xlab = "Days", 
+           ylab = "Survival Probability",
+           title = "Kaplan-Meier Survival Curve",
            ylim = c(0.80, 1.0),
-           xlim = c(0,365),
            risk.table.fontsize = 3,  # Adjust the font size for the risk table
            break.time.by = 100,      # Set the break time for the x-axis
-           ggtheme = theme_matched
-) +
-  labels_matched
+           xlab.text.size = 8,       # Adjust the font size for x-axis label
+           ylab.text.size = 8,       # Adjust the font size for y-axis label
+           legend.text.size = 8,     # Adjust the font size for legend text
+           ggtheme = theme_light() +
+             theme(text = element_text(size = 8),
+                   axis.title.x = element_text(size = 8),
+                   axis.title.y = element_text(size = 8),
+                   legend.text = element_text(size = 8),
+                   plot.title = element_text(size = 12),
+                   axis.text.x = element_text(size = 8),
+                   axis.text.y = element_text(size = 8),
+                   panel.grid = element_blank()
+)) 
 
+ggsave(paste0(path_save,"Supplemental Figure S2_1.tiff"), plot = love_plot_with_distance,height = 7,width = 14,units = "in")
+ggsave(paste0(path_save, "Supplemental Figure S3_1.tiff"), plot = matched_with_distance, dpi = "print",width=7.29, height = 5)
 
-fit_cox_matched1 <- coxph(Surv(surv_time_365, dead_1y) ~
-                      nrp,
-                    data = matched_nrp_dpp1)
-
-summary(fit_cox_matched1)
-
-fit_coxme_matched1 <- coxme(Surv(surv_time_365, dead_1y) ~
-                      nrp + (1|REC_CTR_CD),
-                    data = matched_nrp_dpp1)
-
-summary(fit_coxme_matched1)
 ```
+
+## Adding functional status
+```{r}
+post_match_nrp_dpp_fs <- matchit(nrp ~ 
+                                wdt_time_qtile +
+                                rec_age_60 +
+                                treatment +
+                                don_age +
+                                don_bmi +
+                                functional_status,
+                   data = data_nrp_dpp,method = "optimal",
+                   distance = "glm",
+                   link = "logit",
+                   estimand = "ATT",
+                   replace = FALSE)
+
+new.names <- c(
+               treatment_ECMO = "Recipient Treatment: ECMO",
+               `treatment_High-dose Inotropes` = "Recipient Treatment: High-dose Inotropes",
+               treatment_None = "Recipient Treatment: None",
+               `rec_age_60_Over 60` = "Recipient Age: Over 60",
+               `treatment_IABP` = "Recipient Treatment: IABP",
+               treatment_Exception = "Recipient Treatment: Exception",
+               don_angio_Performed = "Donor Coronary Angiogram: Performed",
+               `treatment_Other MCS` = "Recipient Treatment: Other MCS",
+               `don_age` = "Donor Age (Years)",
+               `treatment_Low-dose Inotropes` = "Recipient Treatment: Low-dose Inotropes",
+               treatment_LVAD = "Recipient Treatment: LVAD",
+               `functional_status_Limited Impairment, 100-70%` = "Functional Status: Limited Impairment, 100-70%",
+               `functional_status_Moderate Impairment, 50-60%` = "Functional Status: Moderate Impairment, 50-60%",
+               `functional_status_Severe Impairment ≥ 40%` = "Functional Status: Limited Impairment, ≥ 40%",
+               `functional_status_Unknown` = "Functional Status: Unknown",
+               `wdt_time_qtile_1st quartile` = "Withdrawal-to-Death Time: 1st Quartile",
+               `wdt_time_qtile_2nd quartile` = "Withdrawal-to-Death Time: 2nd Quartile",
+               `wdt_time_qtile_3rd quartile` = "Withdrawal-to-Death Time: 3rd Quartile",
+               `wdt_time_qtile_4th quartile` = "Withdrawal-to-Death Time: 4th Quartile",
+               don_bmi = "Donor BMI"
+)
+
+love_plot_functional_status <- love.plot(post_match_nrp_dpp_fs, 
+          drop.distance = TRUE, 
+          stars = "raw",
+          var.order = "adjusted",
+          var.names = new.names,
+          abs = TRUE,
+          line = TRUE, 
+          thresholds = c(m = .1),
+          colors = c("#A33E3E", "#7CA5CB")) +
+  theme_light() +
+  theme(legend.position = c(.75, .3),
+        legend.box.background = element_rect(), 
+        legend.box.margin = margin(1, 1, 1, 1),
+        axis.text.y = element_text(size = 10),
+        panel.grid = element_blank())
+
+#get matched data
+matched_nrp_dpp_fs <- match.data(post_match_nrp_dpp_fs, group = "all",distance = "prop_score", data = data_nrp_dpp, drop.unmatched = TRUE)
+
+fit_matched_dcd_fs <- survfit(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp_fs)
+
+#matched KM
+matched_with_fs <- ggsurvplot(fit_matched_dcd_fs, data = matched_nrp_dpp_fs, risk.table = TRUE, 
+           legend.labs = c("DCD DPP", "DCD NRP"),
+           legend.title = element_blank(),
+           pval = TRUE,
+           conf.int = TRUE,
+           palette = c("#7CA5CB","#A33E3E"),
+           xlab = "Days", 
+           ylab = "Survival Probability",
+           title = "Matched Cohorts (n=204)",
+           ylim = c(0.80, 1.0),
+           risk.table.fontsize = 3,  # Adjust the font size for the risk table
+           break.time.by = 100,      # Set the break time for the x-axis
+           xlab.text.size = 8,       # Adjust the font size for x-axis label
+           ylab.text.size = 8,       # Adjust the font size for y-axis label
+           legend.text.size = 8,     # Adjust the font size for legend text
+           ggtheme = theme_light() +
+             theme(text = element_text(size = 8),
+                   axis.title.x = element_text(size = 8),
+                   axis.title.y = element_text(size = 8),
+                   legend.text = element_text(size = 8),
+                   plot.title = element_text(size = 12),
+                   axis.text.x = element_text(size = 8),
+                   axis.text.y = element_text(size = 8),
+                   panel.grid = element_blank()
+)) 
+ggsave(paste0(path_save,"Supplemental Figure S4.tiff"), plot = love_plot_functional_status,height = 7,width = 14,units = "in")
+ggsave(paste0(path_save, "Supplemental Figure S5.tiff"), plot = matched_with_fs, dpi = "print",width=7.29, height = 5)
+
+```
+
+##Add all impact factor and donor risk index terms
+```{r}
+
+data_nrp_dpp <- data_nrp_dpp %>% 
+  #left_join(tx_hr %>% dplyr::select(PX_ID, CAN_DRUG_TREAT_HYPERTEN), by = "PX_ID")
+  left_join(tx_hr %>% dplyr::select(PX_ID, CAN_DIAB), by = "PX_ID")
+#IMPACT factor terms
+  #heart failure etiology (diagnosis** all "Other")
+  #hypertension (CAN_DRUG_TREAT_HYPERTEN == 1 **EMPTY!!)
+  #diabetes mellitus (can_diab** EMPTY!!)
+  #creatinine (can_creat)
+  #serum bili (bilirubin_bins)
+  #mechanical vent (rec_vent)
+#donor risk index terms
+  #ischemic time (total_ischemic_time)
+  #donor age; (don_age)
+  #race mismatching (race_mismatch)
+  #blood urea nitrogen (BUN)/creatinine ratio (don_bun_creat_ratio_over_30_factor)
+
+data_nrp_dpp1 <- data_nrp_dpp %>% 
+  filter(complete.cases(
+    wdt_time_qtile,
+    rec_age_60 ,
+    treatment ,
+      don_age ,
+      don_bmi ,
+      CAN_MOST_RECENT_CREAT , 
+      bilirubin_bins , 
+      rec_vent ,
+      total_ischemic_time ,
+      don_age , 
+      race_mismatch,
+      don_bun_creat_ratio_over_30_factor
+  ))
+
+post_match_nrp_dpp_all <- matchit(nrp ~ 
+                                wdt_time_qtile +
+                                rec_age_60 +
+                                treatment +
+                                don_age +
+                                don_bmi +
+                                CAN_MOST_RECENT_CREAT + 
+                                bilirubin_bins + 
+                                rec_vent +
+                                total_ischemic_time +
+                                don_age + 
+                                race_mismatch+
+                                don_bun_creat_ratio_over_30_factor,
+                   data = data_nrp_dpp1,method = "optimal",
+                   distance = "glm",
+                   link = "logit",
+                   estimand = "ATT",
+                   replace = FALSE)
+
+new.names <- c(
+               treatment_ECMO = "Recipient Treatment: ECMO",
+               `treatment_High-dose Inotropes` = "Recipient Treatment: High-dose Inotropes",
+               treatment_None = "Recipient Treatment: None",
+               `rec_age_60_Over 60` = "Recipient Age: Over 60",
+               `treatment_IABP` = "Recipient Treatment: IABP",
+               treatment_Exception = "Recipient Treatment: Exception",
+               `treatment_Other MCS` = "Recipient Treatment: Other MCS",
+               `don_age` = "Donor Age (Years)",
+               `treatment_Low-dose Inotropes` = "Recipient Treatment: Low-dose Inotropes",
+               `wdt_time_qtile_1st quartile` = "Withdrawal-to-Death Time: 1st Quartile",
+               `wdt_time_qtile_2nd quartile` = "Withdrawal-to-Death Time: 2nd Quartile",
+               `wdt_time_qtile_3rd quartile` = "Withdrawal-to-Death Time: 3rd Quartile",
+               `wdt_time_qtile_4th quartile` = "Withdrawal-to-Death Time: 4th Quartile",
+               treatment_LVAD = "Recipient Treatment: LVAD",
+               `don_bun_creat_ratio_over_30_factor_Over 30` = "Donor BUN:Creatinine Ratio, Greater than 30",
+               `CAN_MOST_RECENT_CREAT` = "Recipient Creatinine",
+              `bilirubin_bins_0-0.99` = "Recipient Bilirubin, 0-0.99",
+              `bilirubin_bins_1-1.99` = "Recipient Bilirubin, 1-1.99",
+              `bilirubin_bins_2-3.99` = "Recipient Bilirubin, 2-3.99",
+              `bilirubin_bins_> 4` = "Recipient Bilirubin, >4",
+               `don_bmi` = "Donor BMI",
+               `rec_vent`="Recipient Ventilator",
+              `race_mismatch_Donor/recipient race mismatch` = "Donor/Recipient Race Mismatch",
+              total_ischemic_time = "Total Ischemic Time (min)")
+
+love_plot_all<- love.plot(post_match_nrp_dpp_all, 
+          drop.distance = TRUE, 
+          stars = "raw",
+          var.order = "adjusted",
+          var.names = new.names,
+          abs = TRUE,
+          line = TRUE, 
+          thresholds = c(m = .1),
+          colors = c("#A33E3E", "#7CA5CB")) +
+  theme_light() +
+  theme(legend.position = c(.75, .3),
+        legend.box.background = element_rect(), 
+        legend.box.margin = margin(1, 1, 1, 1),
+        axis.text.y = element_text(size = 10),
+        panel.grid = element_blank())
+
+#get matched data
+matched_nrp_dpp_all <- match.data(post_match_nrp_dpp_all, group = "all",distance = "prop_score", data = data_nrp_dpp1, drop.unmatched = TRUE)
+
+fit_matched_dcd_all <- survfit(Surv(surv_time_365, dead_1y) ~ nrp, data = matched_nrp_dpp_all)
+
+#matched KM
+matched_with_all <- ggsurvplot(fit_matched_dcd_all, data = matched_nrp_dpp_all, risk.table = TRUE, 
+           legend.labs = c("DCD DPP", "DCD NRP"),
+           legend.title = element_blank(),
+           pval = TRUE,
+           conf.int = TRUE,
+           palette = c("#7CA5CB","#A33E3E"),
+           xlab = "Days", 
+           ylab = "Survival Probability",
+           title = "Matched Cohorts (n=204)",
+           ylim = c(0.80, 1.0),
+           risk.table.fontsize = 3,  # Adjust the font size for the risk table
+           break.time.by = 100,      # Set the break time for the x-axis
+           xlab.text.size = 8,       # Adjust the font size for x-axis label
+           ylab.text.size = 8,       # Adjust the font size for y-axis label
+           legend.text.size = 8,     # Adjust the font size for legend text
+           ggtheme = theme_light() +
+             theme(text = element_text(size = 8),
+                   axis.title.x = element_text(size = 8),
+                   axis.title.y = element_text(size = 8),
+                   legend.text = element_text(size = 8),
+                   plot.title = element_text(size = 12),
+                   axis.text.x = element_text(size = 8),
+                   axis.text.y = element_text(size = 8),
+                   panel.grid = element_blank()
+)) 
+
+ggsave(paste0(path_save,"Supplemental Figure S6.tiff"), plot = love_plot_all,height = 7,width = 14,units = "in")
+ggsave(paste0(path_save, "Supplemental Figure S7.tiff"), plot = matched_with_all, dpi = "print",width=7.29, height = 5)
+
+```
+
+## Compare DBD 1-year survival by center type
+```{r}
+#get center IDs
+dcd_ctr_ids <- data_nrp_dpp %>% 
+  dplyr::select(REC_CTR_CD) %>% 
+  distinct() 
+
+nrp_ctr_ids <- data_nrp_dpp %>%
+  group_by(REC_CTR_CD, nrp) %>%
+  count() %>% 
+  filter(nrp==1) %>% 
+  dplyr::select(REC_CTR_CD) %>% 
+  ungroup()
+
+ctr_dbd_patients <- tx_list1 %>%
+  filter(don_dbd =="Y") %>%
+  filter(can_age > 17) %>% 
+  filter(REC_CTR_CD %in% dcd_ctr_ids$REC_CTR_CD) %>%
+  mutate(nrp_center = ifelse(REC_CTR_CD %in% nrp_ctr_ids$REC_CTR_CD, 1, 0)) %>% 
+  mutate(
+    rec_death_date = case_when(
+      !is.na(PERS_SSA_DEATH_DT) ~ PERS_SSA_DEATH_DT,
+      !is.na(TFL_DEATH_DT) ~ TFL_DEATH_DT)) %>% 
+  mutate(dead = ifelse(!is.na(rec_death_date), 1, 0)) %>% 
+  mutate(dead_1y = case_when(
+    dead == 1 & (as.Date(rec_death_date) - as.Date(tx_date) < 366) ~ 1,
+    dead == 0 & (as.Date(TFL_LAFUDATE) - as.Date(tx_date) < 366) ~ 0,
+    dead == 0 & (as.Date(TFL_LAFUDATE) - as.Date(tx_date) >=366) ~ 0,
+    dead == 1 & (as.Date(rec_death_date) - as.Date(tx_date) >=366) ~ 0
+           ),
+    final_dt = case_when(
+          is.na(rec_death_date) == FALSE ~ rec_death_date,
+          is.na(last_fu_date) == FALSE ~ last_fu_date),
+    surv_time = final_dt - tx_date) %>% 
+  mutate(
+    surv_time_365 = ifelse(surv_time > 365 | surv_time == 365, 365, surv_time))
+
+ctr_type_and_dbd_survival <- ctr_dbd_patients %>% 
+  group_by(REC_CTR_CD, dead_1y, nrp_center) %>%
+  count() %>% 
+  ungroup() %>% 
+  spread(key = "dead_1y", value = "n", drop = FALSE) %>% 
+  rename("Living" = `0`,
+         "Dead" = `1`) %>% 
+  ungroup() %>% 
+  mutate(Dead = ifelse(is.na(Dead), 0, Dead)) %>% 
+  mutate(survival_rate_by_center = (1-Dead)*100/(Dead + Living)) %>% 
+  filter(!is.na(survival_rate_by_center)) %>% 
+  group_by(nrp_center) %>% 
+  mutate(nrp_center_average_survival = mean(survival_rate_by_center)) %>% 
+  ungroup()
+
+center_dbd_rate <- ctr_type_and_dbd_death %>% 
+  dplyr::select(REC_CTR_CD, dead_rate_by_center) %>% 
+  distinct() 
+
+dbd_survival <- ggboxplot(ctr_type_and_dbd_survival, x = "nrp_center", y = "survival_rate_by_center",
+          add = "jitter",
+          color = "nrp_center",
+        ylab = "Survival Probability (%) at 1-Year after DBD Heart Transplantation ", 
+        xlab = "Transplant Center DCD Procurement Practice") +
+  scale_x_discrete(labels = c("Does Not Perform NRP", "Performs NRP")) +
+  scale_color_nrp(palette = "dpp_nrp", discrete = TRUE,labels = c("Does Not Perform NRP", "Performs NRP")) +
+  guides(color=guide_legend(title="Does Center Perform NRP"))
+
+ggsave(paste0(path_save,"DBD Survival by Center.tiff"), plot= dbd_survival, height= 7, width=6, units = "in")
+
+
+```
+
+
+
 ## COXME analysis without PS
 ```{r}
 fit_coxme_unmatched1 <- coxme(Surv(surv_time_365, dead_1y) ~
@@ -1249,165 +1915,5 @@ fit_coxme_unmatched1 <- coxme(Surv(surv_time_365, dead_1y) ~
 summary(fit_coxme_unmatched1)
 ```
 
-
-
-## Changing Definition of NRP to death-to-clamp time > 50 minutes
-```{r histogram}
-#histogram of amount of time between death to cross clamp
-hist_clamp_sens <- ggplot(complete_data_dcd, aes(x = death_to_clamp_min, fill = factor(procurement_type_sens)), alpha = 0.7) +
-  geom_histogram(binwidth = 1) +
-  labs(x = "Death-to-Cross-Clamping Time (Minutes)", y = "Frequency", fill = "Procurement Type") +
-  theme_light() +
-  theme(legend.position = "bottom",
-        panel.grid = element_blank(),
-        text = element_text(size = 8)) +
-  scale_fill_nrp(palette = "dpp_nrp", discrete = TRUE, labels = c("DPP", "NRP")) +
-  labs(fill = "Procurement Type")
-
-ggsave(paste0(path_save,"Figure_S2_histo_clamp.tiff"), hist_clamp_sens, dpi = "print",width=7.29, height = 3)
-
-```
-
-```{r propensity score match}
-data_nrp_dpp_sens <- complete_data_dcd %>% 
-  mutate(nrp_sens = ifelse(procurement_type_sens== "DCD_NRP_sens", 1, 0))
-
-#1:1 OLS PS matching with replacement
-post_match_nrp_dpp_sens <- matchit(nrp_sens ~ 
-                                wdt_time_qtile +
-                                rec_age_60 +
-                                treatment +
-                                don_age +
-                                don_bmi_qtile +
-                                don_angio,
-                   data = data_nrp_dpp_sens,method = "optimal",
-                   distance = "glm",
-                   link = "logit",
-                   estimand = "ATT",
-                   replace = FALSE)
-
-
-new.names <- c(`wdt_time_qtile_1st quartile` = "Withdrawal-to-Death Time: 1st Quartile",
-               treatment_ECMO = "Recipient Treatment: ECMO",
-               `treatment_High-dose Inotropes` = "Recipient Treatment: High-dose Inotropes",
-               treatment_None = "Recipient Treatment: None",
-               `don_bmi_qtile_2nd quartile` = "Donor BMI: 2nd Quartile",
-               `don_bmi_qtile_4th quartile` = "Donor BMI: 4th Quartile",
-               `rec_age_60_Over 60` = "Recipient Age: Over 60",
-               `wdt_time_qtile_2nd quartile` = "Withdrawal-to-Death Time: 2nd Quartile",
-               `treatment_IABP` = "Recipient Treatment: IABP",
-               `wdt_time_qtile_3rd quartile` = "Withdrawal-to-Death Time: 3rd Quartile",
-               treatment_Exception = "Recipient Treatment: Exception",
-               don_angio_Performed = "Donor Coronary Angiogram: Performed",
-               `treatment_Other MCS` = "Recipient Treatment: Other MCS",
-               `don_age` = "Donor Age (Years)",
-               `treatment_Low-dose Inotropes` = "Recipient Treatment: Low-dose Inotropes",
-               `wdt_time_qtile_4th quartile` = "Withdrawal-to-Death Time: 4th Quartile",
-               treatment_LVAD = "Recipient Treatment: LVAD",
-               `don_bmi_qtile_1st quartile` = "Donor BMI: 1st Quartile",
-               `don_bmi_qtile_3rd quartile` = "Donor BMI: 3rd Quartile")
-
-love_plot_nrp_dpp_sens <- love.plot(post_match_nrp_dpp_sens, 
-          drop.distance = TRUE, 
-          stars = "raw",
-          var.order = "adjusted",
-          var.names = new.names,
-          abs = TRUE,
-          line = TRUE, 
-          thresholds = c(m = .1),
-          colors = c("#A33E3E", "#7CA5CB")) +
-  theme_light() +
-  theme(legend.position = c(.75, .3),
-        legend.box.background = element_rect(), 
-        legend.box.margin = margin(1, 1, 1, 1),
-        axis.text.y = element_text(size = 10),
-        panel.grid = element_blank())
-
-
-ggsave(paste0(path_save,"Supplemental Figure 3 sensitvity analysis.tiff"), plot = love_plot_nrp_dpp_sens,height = 7,width = 14,units = "in")
-
-
-#get matched data
-matched_nrp_dpp_sens <- match.data(post_match_nrp_dpp_sens, group = "all",distance = "prop_score", data = data_nrp_dpp_sens, drop.unmatched = TRUE)
-
-
-```
-
-```{r km curve}
-
-# Fit Kaplan-Meier survival curves for each group
-fit_matched_dcd_sens <- survfit(Surv(surv_time_365, dead_1y) ~ nrp_sens, data = matched_nrp_dpp_sens)
-
-fit_dcd_sens <- survfit(Surv(surv_time_365, dead_1y) ~ nrp_sens, data = data_nrp_dpp_sens)
-
-#adjust grid structure
-grid.draw.ggsurvplot <- function(x){
-  survminer:::print.ggsurvplot(x, newpage = FALSE)
-}
-
-#pre-match KM with CI
-km_dcd_plot_sens <- ggsurvplot(fit_dcd_sens, data = data_nrp_dpp_sens, risk.table = TRUE, 
-           legend.labs = c("DPP", "NRP"),
-           pval = TRUE,
-           conf.int = TRUE,
-           palette = c("#7CA5CB","#A33E3E"),
-           ylim = c(0.80, 1.0),
-           xlim = c(0,365),
-           risk.table.fontsize = 3,  # Adjust the font size for the risk table
-           break.time.by = 100,      # Set the break time for the x-axis
-           ggtheme = theme_unmatched) +
-  labels_unmatched
-
-#matched KM
-km_dcd_matched_sens <- ggsurvplot(fit_matched_dcd_sens, data = matched_nrp_dpp_sens, risk.table = TRUE, 
-           legend.labs = c("DPP","NRP"),
-           legend.title = element_blank(),
-           pval = TRUE,
-           conf.int = TRUE,
-           palette = c("#7CA5CB","#A33E3E"),
-           ylim = c(0.80, 1.0),
-           xlim = c(0,365),
-           risk.table.fontsize = 3,  # Adjust the font size for the risk table
-           break.time.by = 100,      # Set the break time for the x-axis
-           ggtheme = theme_matched
-) +
-  labels_matched
-
-#make graphs with CI
-dcd_with_ci_sens <- list()
-dcd_with_ci_sens[[1]] <- km_dcd_plot_sens
-dcd_with_ci_sens[[2]] <- km_dcd_matched_sens
-dcd_with_ci_sens <- arrange_ggsurvplots(dcd_with_ci_sens, print = TRUE,
-  ncol = 2, nrow = 1, risk.table.height = 0.2)
-
-ggsave(paste0(path_save, "Supplemental Figure 4 Sensitivity.tiff"),dcd_with_ci_sens, dpi = "print",width=7.29, height = 5)
-```
-
-```{r}
-#COXPH model
-fit_cox_matched_sens <- coxph(Surv(surv_time_365, dead_1y) ~
-                      nrp_sens,
-                    data = matched_nrp_dpp_sens)
-
-summary(fit_cox_matched_sens)
-
-fit_cox_unmatched_sens <- coxph(Surv(surv_time_365, dead_1y) ~
-                      nrp_sens,
-                    data = data_nrp_dpp_sens)
-
-summary(fit_cox_unmatched_sens)
-
-export_summs(fit_cox_unmatched_sens,
-     fit_cox_matched_sens, 
-     scale = TRUE,
-     model.names = c("Unmatched", "PS Matched"),
-     coefs = c("Procurement Type NRP" = "nrp_sens"),
-     number_format = "%.2f",
-     statistics = c(N = "n", "N Events" = "nevent"),
-     align = ".",
-     error_format = "({conf.low} to {conf.high})",
-     to.file = "xlsx",
-     file.name = paste0(path_save,"Supplemental Table 4.xlsx"))
-```
 
 

@@ -49,83 +49,148 @@ library(tableone)
 
 # Import data
 
-```{r load data}
+```{r load data ishlt}
 
-path <- "C:/Users/julia/SRP/S&D/dataset/pubsaf2303/"
+path1 <- "C:/Users/julia/SRP/S&D/dataset/pubsaf2309/"
+path2 <- "C:/Users/julia/SRP/S&D/dataset/pubsaf2303/"
 
-cand_thor <- read_sas(paste0(path, "cand_thor.sas7bdat"), NULL) %>%  
+cand_thor <- read_sas(paste0(path1, "cand_thor.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
-tx_hr <- read_sas(paste0(path, "tx_hr.sas7bdat"), NULL) %>%  
+tx_hr <- read_sas(paste0(path1, "tx_hr.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
-txf_hr <- read_sas(paste0(path, "txf_hr.sas7bdat"), NULL) %>%  
+txf_hr <- read_sas(paste0(path1, "txf_hr.sas7bdat"), NULL) %>%  
    zap_formats() %>% zap_labels()
 
-just_form_hr <- read_sas(paste0(path, "JustFormHR.sas7bdat"), NULL) %>%  
+just_form_hr <- read_sas(paste0(path2, "JustFormHR.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
 just_form_hr_stat1 <- 
-  read_sas(paste0(path, "JustFormHRStat1.sas7bdat"), NULL) %>%  
+  read_sas(paste0(path2, "JustFormHRStat1.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
 just_form_hr_stat2 <- 
-  read_sas(paste0(path, "JustFormHRStat2.sas7bdat"), NULL) %>%  
+  read_sas(paste0(path2, "JustFormHRStat2.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
 just_form_hr_stat3 <- 
-  read_sas(paste0(path, "JustFormHRStat3.sas7bdat"), NULL) %>%  
+  read_sas(paste0(path2, "JustFormHRStat3.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
 just_form_hr_stat4 <- 
-  read_sas(paste0(path, "JustFormHRStat4.sas7bdat"), NULL) %>%  
+  read_sas(paste0(path2, "JustFormHRStat4.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
 risk_strat_data_hr <- 
-  read_sas(paste0(path, "RiskStratDataHR.sas7bdat"), NULL) %>%  
+  read_sas(paste0(path2, "RiskStratDataHR.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
 just_form_hr_data_link <- 
-  read_sas(paste0(path, "JustFormHRDataLink.sas7bdat"), NULL) %>%  
+  read_sas(paste0(path2, "JustFormHRDataLink.sas7bdat"), NULL) %>%  
   zap_formats() %>% zap_labels()
 
 status_just_episode <- 
-  read_sas(paste0(path,"StatusJustEpisode.sas7bdat"), NULL) %>%
+  read_sas(paste0(path2,"StatusJustEpisode.sas7bdat"), NULL) %>%
   zap_formats() %>% zap_labels()
 
-statjust_hr1a <- 
-  read_sas(paste0(path, "statjust_hr1a.sas7bdat"), NULL) %>%
+institution <- read_sas(paste0(path2, "institution.sas7bdat"), NULL) %>%
   zap_formats() %>% zap_labels()
 
-statjust_hr1b <- 
-  read_sas(paste0(path, "statjust_hr1b.sas7bdat"), NULL) %>%
+opo <- read_sas(paste0(path2, "hist_opo_txc.sas7bdat"), NULL) %>%
   zap_formats() %>% zap_labels()
 
-institution <- read_sas(paste0(path, "institution.sas7bdat"), NULL) %>%
-  zap_formats() %>% zap_labels()
-
-opo <- read_sas(paste0(path, "hist_opo_txc.sas7bdat"), NULL) %>%
-  zap_formats() %>% zap_labels()
-
-donor <- read_sas(paste0(path, "donor_deceased.sas7bdat"), NULL) %>%
+donor <- read_sas(paste0(path2, "donor_deceased.sas7bdat"), NULL) %>%
   zap_formats() %>%  zap_labels()
 
-deceasedtodonhosp <- read_sas(paste0(path, "deceasedtodonhosp.sas7bdat"), NULL) %>% 
+deceasedtodonhosp <- read_sas(paste0(path2, "deceasedtodonhosp.sas7bdat"), NULL) %>% 
   zap_formats() %>% zap_labels()
 
-donorhospital <- read_sas(paste0(path, "donorhospital.sas7bdat"), NULL) %>% 
+donorhospital <- read_sas(paste0(path2, "donorhospital.sas7bdat"), NULL) %>% 
   zap_formats() %>% zap_labels()
 
-donor_disposition <- read_sas(paste0(path, "donor_disposition.sas7bdat"), NULL) %>% 
+donor_disposition <- read_sas(paste0(path2, "donor_disposition.sas7bdat"), NULL) %>% 
   zap_formats() %>% zap_labels()
 
 
 waitlist_center <- read_sas(paste0("C:/Users/julia/SRP/S&D/dataset/HospData/", "waitlist_center.sas7bdat"), NULL) %>% 
   zap_formats() %>% zap_labels()
 
-dondeathdatetime <- read_sas(paste0(path, "dondeathdatetime.sas7bdat"), NULL) %>% 
+dondeathdatetime <- read_sas(paste0(path2, "dondeathdatetime.sas7bdat"), NULL) %>% 
   zap_formats() %>% zap_labels()
 
+```
+
+
+```{r load data jhlt}
+
+path1 <- "C:/Users/julia/SRP/S&D/dataset/pubsaf2309/"
+path2 <- "C:/Users/julia/SRP/S&D/dataset/pubsaf2303/"
+
+cand_thor <- read_sas(paste0(path2, "cand_thor.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+tx_hr <- read_sas(paste0(path2, "tx_hr.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+txf_hr <- read_sas(paste0(path2, "txf_hr.sas7bdat"), NULL) %>%  
+   zap_formats() %>% zap_labels()
+
+just_form_hr <- read_sas(paste0(path2, "JustFormHR.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+just_form_hr_stat1 <- 
+  read_sas(paste0(path2, "JustFormHRStat1.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+just_form_hr_stat2 <- 
+  read_sas(paste0(path2, "JustFormHRStat2.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+just_form_hr_stat3 <- 
+  read_sas(paste0(path2, "JustFormHRStat3.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+just_form_hr_stat4 <- 
+  read_sas(paste0(path2, "JustFormHRStat4.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+risk_strat_data_hr <- 
+  read_sas(paste0(path2, "RiskStratDataHR.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+just_form_hr_data_link <- 
+  read_sas(paste0(path2, "JustFormHRDataLink.sas7bdat"), NULL) %>%  
+  zap_formats() %>% zap_labels()
+
+status_just_episode <- 
+  read_sas(paste0(path2,"StatusJustEpisode.sas7bdat"), NULL) %>%
+  zap_formats() %>% zap_labels()
+
+institution <- read_sas(paste0(path2, "institution.sas7bdat"), NULL) %>%
+  zap_formats() %>% zap_labels()
+
+opo <- read_sas(paste0(path2, "hist_opo_txc.sas7bdat"), NULL) %>%
+  zap_formats() %>% zap_labels()
+
+donor <- read_sas(paste0(path2, "donor_deceased.sas7bdat"), NULL) %>%
+  zap_formats() %>%  zap_labels()
+
+deceasedtodonhosp <- read_sas(paste0(path2, "deceasedtodonhosp.sas7bdat"), NULL) %>% 
+  zap_formats() %>% zap_labels()
+
+donorhospital <- read_sas(paste0(path2, "donorhospital.sas7bdat"), NULL) %>% 
+  zap_formats() %>% zap_labels()
+
+donor_disposition <- read_sas(paste0(path2, "donor_disposition.sas7bdat"), NULL) %>% 
+  zap_formats() %>% zap_labels()
+
+
+waitlist_center <- read_sas(paste0("C:/Users/julia/SRP/S&D/dataset/HospData/", "waitlist_center.sas7bdat"), NULL) %>% 
+  zap_formats() %>% zap_labels()
+
+dondeathdatetime <- read_sas(paste0(path2, "dondeathdatetime.sas7bdat"), NULL) %>% 
+  zap_formats() %>% zap_labels()
 
 ```
 
@@ -323,7 +388,7 @@ Organ procurement technique:
 
 We identify the following outcome variables
 
-29.  Death within 1-year post-transplantation (all causes) and date of death
+29.  Death within 12 months and 18 months post-transplantation (all causes) and date of death
 
 We will calculate the treatment variable - distance between candidate and donor hospitals - using longitude and latitude information
 
@@ -451,13 +516,11 @@ tx_list3 <- tx_list2 %>%
     rec_age_60 = ifelse(rec_age > 60, 1, 0),
     
     #outcome variables
-    graft_failed = ifelse(!is.na(gf_date), 1, 0),
-    gf_1y = ifelse(!is.na(gf_date) & 
-                     (as.Date(gf_date) - as.Date(tx_date) < 366), 1, 0),
     dead = ifelse(!is.na(rec_death_date), 1, 0),
     dead_1y = ifelse(dead == 1 & 
                             (as.Date(rec_death_date) - as.Date(tx_date) < 366), 1, 0),
-         retx = ifelse(last_status == "R", 1, 0)    ) 
+    dead_18m = ifelse(dead==1 &
+                        (as.Date(rec_death_date) - as.Date(tx_date) < 547), 1, 0)) 
 
 ```
 
@@ -664,17 +727,22 @@ final_sample <- final_sample %>%
 
 # Link with Geo Data
 ```{r}
+#clean donor hospital geographic information
+donorhospital_fixed <- donorhospital %>% 
+  filter(!is.na(LONGITUDE) & !is.na(LATITUDE)) %>% 
+  distinct(PROVIDER_NUM,.keep_all = TRUE)
+
 # Link donor id to donor hospital geographic data using deceasedtodonhosp
 donor_geo <- deceasedtodonhosp %>% 
   dplyr::select(DONOR_ID, DON_HOSP_PROV_NUM) %>% 
-  left_join(donorhospital, by = c("DON_HOSP_PROV_NUM" = "PROVIDER_NUM"), keep = FALSE, na_matches = "never") %>% 
+  left_join(donorhospital_fixed, by = c("DON_HOSP_PROV_NUM" = "PROVIDER_NUM"), keep = FALSE, na_matches = "never") %>% 
   dplyr::select(DONOR_ID, DON_HOSP_PROV_NUM, HOSPITAL_NAME, LONGITUDE, LATITUDE) %>% 
   distinct(DONOR_ID, .keep_all = TRUE)
   
 #data quality check - no observation has no geographical information associated with donor hospital
 View(final_sample %>%dplyr::select(DONOR_ID) %>% 
-  left_join(donor_geo, by = "DONOR_ID", keep = FALSE, na_matches = "never") %>% 
-    filter(is.na(LONGITUDE))) 
+  left_join(deceasedtodonhosp, by = "DONOR_ID", keep = FALSE, na_matches = "never") %>% 
+    filter(is.na(DON_HOSP_PROV_NUM))) 
 
 #merge donor geographic data to final_sample
 final_sample1 <- final_sample %>% 
@@ -874,8 +942,7 @@ final_sample4 <- final_sample4 %>%
         
         final_dt = case_when(
           is.na(rec_death_date) == FALSE ~ rec_death_date,
-          is.na(last_fu_date) == FALSE ~ last_fu_date,
-          TRUE ~ rem_dt),
+          is.na(last_fu_date) == FALSE ~ last_fu_date),
         
         obs_days = final_dt - tx_date)
 ```
@@ -887,13 +954,10 @@ final_sample5 <- final_sample4 %>%
     surv_time = as.numeric(final_dt - tx_date),
     
     # Recipient survival time, administratively censored at 1 year
-    surv_time_365 = ifelse(surv_time >= 365, 365, surv_time),
+    surv_time_365 = ifelse(surv_time > 365 | surv_time == 365, 365, surv_time),
     
-    #Time until primary graft failure
-    gf_time = as.numeric(gf_date - tx_date),
-    
-    #Time until primary graft failure, administratively censored at 1 year
-    gf_time_365 = ifelse(gf_time >= 365, 365, gf_time),
+    # Recipient survival time, administratively censored at 18 months
+    #surv_time_18m = ifelse(surv_time > 547 | surv_time == 547, 547, surv_time),
     
     status = factor(status, levels = c(2110, 2120, 2130, 2140, 2150, 2160),
                         labels = c("Status 1", "Status 2", "Status 3", "Status 4", "Status 5", "Status 6")),
@@ -1022,6 +1086,13 @@ final_sample5 <- final_sample4 %>%
     
     ) 
 
+#for patients who are censored before 18-month time point, make Day 547 their day of observation, set dead = 1
+# 
+# final_sample5 <- final_sample5 %>% 
+#   mutate(surv_time_18m = ifelse(dead_18m==0 & surv_time_18m <547, 547, surv_time_18m))
+# 
+# final_sample5 %>% filter(dead_18m == 0 & surv_time_18m<547) %>% View()
+
 final_sample5 <- final_sample5 %>% 
   set_variable_labels(total_ischemic_time = "Donor heart total ischemic time",
                       distance = "Distance between donor and candidate (NM)",
@@ -1079,14 +1150,12 @@ final_sample5 <- final_sample5 %>%
 
 
 ```{r}
-final_sample5 <- final_sample5 %>% 
-  dplyr::select(-c(gf_time_365, gf_time, gf_date, rec_vad_tah, rec_defib, rec_vad_b2, gf_1y)) %>%  
-  dplyr::select(-c(TRR_ID, DONOR_ID, tx_date, last_fu_date, TFL_DEATH_DT, PERS_OPTN_DEATH_DT, don_longitude, don_latitude, rec_longitude, rec_latitude, PERS_SSA_DEATH_DT, PERS_OPTN_DEATH_DT))
-
-
 complete_data_dcd <- final_sample5 %>% 
     filter(complete.cases(PX_ID, 
-    dead_1y, surv_time_365, 
+    dead_1y, 
+    #dead_18m, 
+    surv_time_365, 
+    #surv_time_18m,
     procurement_type, 
     procurement_type_sens,
     #distance,
@@ -1130,11 +1199,13 @@ complete_data_dcd <- final_sample5 %>%
 
 ```{r, eval = FALSE}
 #final sample with geodata
-write_csv(complete_data_dcd, "complete_data_dcd_0915.csv")
+# write_csv(complete_data_dcd, "complete_data_dcd_1016_ishlt.csv")
+write_csv(complete_data_dcd, file = paste0(path2, "complete_data_dcd_1113.csv"))
+
 ```
 
 ```{r}
-save(complete_data_dcd, tx_hr, donor_info, donor, donor_geo, rec_geo, file = paste0(path, "clean_data0911.RData"))
+save(complete_data_dcd, tx_hr, donor_info, donor, donor_geo, rec_geo, tx_list1, file = paste0(path2, "clean_data_1113_jhlt.RData"))
 ```
 
 
